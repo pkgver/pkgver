@@ -34,6 +34,14 @@ async fn main() {
         let message = commits[i].get("commit").unwrap().get("message").unwrap();
         let message_split: Vec<&str> = message.as_str().unwrap().split(' ').collect();
 
+        if commits.len() == 1 {
+            versions.insert(
+                message_split.get(3).unwrap(),
+                commits[i].get("sha").unwrap().as_str().unwrap(),
+            );
+            break;
+        }
+
         if *message_split.first().unwrap() == format!("{package_name}:")
             && *message_split.get(2).unwrap() == "->"
         {
