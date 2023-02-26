@@ -21,7 +21,7 @@ async fn fetch_versions_from_nixpkgs(
 ) {
     let client = reqwest::Client::new();
 
-    let package_path = format!("development/libraries/{package_name}");
+    let package_path = get_package_path(&client, package_name).await;
     let mut page = 1;
 
     loop {
@@ -75,4 +75,33 @@ async fn fetch_versions_from_nixpkgs(
         }
         page += 1;
     }
+}
+
+async fn get_package_path(client: &reqwest::Client, package_name: &str) -> String {
+    let all_packages = client
+        .get("https://raw.githubusercontent.com/NixOS/nixpkgs/master/pkgs/top-level/all-packages.nix")
+        .header(CONTENT_TYPE, "application/json")
+        .header(
+            header::USER_AGENT,
+            header::HeaderValue::from_str("My User Agent/1.0").unwrap(),
+        )
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    let path = all_packages
+        .split('\n')
+        .find(|l| l.contains(format!(" {package_name} = ").as_str()))
+        .unwrap()
+        .split(' ')
+        .collect::<Vec<&str>>();
+
+    let path = &path.get(5).unwrap()[3..];
+
+    println!("PATH: {}", path);
+
+    path.to_string()
 }
