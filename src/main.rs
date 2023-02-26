@@ -1,13 +1,15 @@
 use linked_hash_map::LinkedHashMap;
 use reqwest::header::{self, CONTENT_TYPE};
 use serde_json::Value;
+use std::env;
 
 type Version = String;
 type CommitHash = String;
 
 #[tokio::main]
 async fn main() {
-    let package_name = "glib";
+    let args = env::args().collect::<Vec<String>>();
+    let package_name = args.get(1).unwrap();
 
     let mut versions: LinkedHashMap<Version, CommitHash> = LinkedHashMap::new();
     fetch_versions_from_nixpkgs(&mut versions, package_name).await;
