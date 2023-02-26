@@ -40,7 +40,7 @@ async fn fetch_versions_from_nixpkgs(
         let commits = json.as_array().unwrap();
 
         //goes backwards
-        for i in 0..commits.len() - 1 {
+        for i in 0..commits.len() {
             let message = commits[i].get("commit").unwrap().get("message").unwrap();
             let message_split: Vec<&str> = message.as_str().unwrap().split(' ').collect();
 
@@ -65,7 +65,9 @@ async fn fetch_versions_from_nixpkgs(
                 }
 
                 // _from_ver version's commit sha is one before where its updated to _to_ver
-                versions.insert(from_ver, commits[i + 1].get("sha").unwrap().to_string());
+                if commits.get(i + 1).is_some() {
+                    versions.insert(from_ver, commits[i + 1].get("sha").unwrap().to_string());
+                }
             }
         }
 
