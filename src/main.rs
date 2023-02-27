@@ -1,6 +1,7 @@
 use linked_hash_map::LinkedHashMap;
 use reqwest::header::{self, CONTENT_TYPE};
 use serde_json::Value;
+use rust_fzf::fzf_select;
 use std::env;
 
 type Version = String;
@@ -14,7 +15,11 @@ async fn main() {
     let mut versions: LinkedHashMap<Version, CommitHash> = LinkedHashMap::new();
     fetch_versions_from_nixpkgs(&mut versions, package_name).await;
 
-    println!("{:#?}", versions);
+    let version_keys: Vec<String> = versions.keys().cloned().collect::<Vec<String>>();
+    let options = fzf_select(version_keys);
+    println!("{}", options)
+    
+    //println!("{:#?}", versions);
 }
 
 async fn fetch_versions_from_nixpkgs(
