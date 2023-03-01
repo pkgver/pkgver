@@ -17,9 +17,11 @@ async fn main() {
     fetch_versions_from_nixpkgs(&mut versions, package_name).await;
 
     let version_keys: Vec<String> = versions.keys().cloned().collect::<Vec<String>>();
-    let options = fzf_select(version_keys);
-    println!("{}", options);
-    let version_commit = versions.get(&options).unwrap().replace('\"', "");
+    assert!(!version_keys.is_empty());
+
+    let chosen_version = fzf_select(version_keys);
+    println!("{}", chosen_version);
+    let version_commit = versions.get(&chosen_version).unwrap().replace('\"', "");
     Command::new("nix-shell")
         .args([
             "-p",
@@ -34,7 +36,10 @@ async fn main() {
         .expect("failed to start shell")
         .wait()
         .expect("failed to wait on shell");
-    println!("{:#?}", versions.get(&options).unwrap());
+    let version = versions.get(&chosen_version).unwrap_or_else(|| {
+        panic!("{package_name} version {chosen_version} wasn't found in any of the revisions!")
+    });
+    println!("{:#?}", version);
 }
 
 async fn fetch_versions_from_nixpkgs(
@@ -52,14 +57,16 @@ async fn fetch_versions_from_nixpkgs(
         .header(header::USER_AGENT, header::HeaderValue::from_str("My User Agent/1.0").unwrap())
         .send()
         .await
-        .unwrap()
+        .expect("Couldn't fetch from the nixpkgs github!")
         .text()
         .await
-        .unwrap();
+        .expect("Couldn't get the text from the fetch response!");
 
         let json: Value = serde_json::from_str(&body).unwrap();
 
-        let commits = json.as_array().unwrap();
+        let commits = json
+            .as_array()
+            .expect("Couldn't convert the fetched commits to JSON!");
 
         //goes backwards
         for i in 0..commits.len() {
@@ -111,15 +118,15 @@ async fn get_package_path(client: &reqwest::Client, package_name: &str) -> Strin
         )
         .send()
         .await
-        .unwrap()
+        .expect("Couldn't fetch from the nixpkgs github!")
         .text()
         .await
-        .unwrap();
+        .expect("Couldn't get the text from the fetch response!");
 
     let path = all_packages
         .split('\n')
         .find(|l| l.contains(format!(" {package_name} = ").as_str()))
-        .unwrap()
+        .unwrap_or_else(|| panic!("Couldn't get path for {package_name}"))
         .split(' ')
         .collect::<Vec<&str>>();
 
