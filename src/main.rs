@@ -1,17 +1,22 @@
+use clap::Parser;
 use linked_hash_map::LinkedHashMap;
 use reqwest::header::{self, CONTENT_TYPE};
 use serde_json::Value;
-use std::env;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
 type Version = String;
 type CommitHash = String;
 
+#[derive(Parser, Debug)]
+struct Args {
+    package_name: String,
+}
+
 #[tokio::main]
 async fn main() {
-    let args = env::args().collect::<Vec<String>>();
-    let package_name = args.get(1).unwrap();
+    let args = Args::parse();
+    let package_name = &args.package_name;
 
     let mut versions: LinkedHashMap<Version, CommitHash> = LinkedHashMap::new();
     fetch_versions_from_nixpkgs(&mut versions, package_name).await;
