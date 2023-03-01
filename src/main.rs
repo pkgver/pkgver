@@ -86,6 +86,12 @@ async fn fetch_versions_from_nixpkgs(
                 break;
             }
 
+            /*
+               TODO:
+                   dwmbar: init at X
+                   dwmbar: 0.1 -> 0.2
+                   dwmbar: unstableXX -> unstableYY
+            */
             if *message_split.first().unwrap() == format!("{package_name}:")
                 && message_split.len() > 2
                 && *message_split.get(2).unwrap() == "->"
