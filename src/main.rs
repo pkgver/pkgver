@@ -19,7 +19,7 @@ async fn main() {
     let version_keys: Vec<String> = versions.keys().cloned().collect::<Vec<String>>();
     let options = fzf_select(version_keys);
     println!("{}", options);
-    let version_commit = versions.get(&options).unwrap().replace("\"", "");
+    let version_commit = versions.get(&options).unwrap().replace('\"', "");
     Command::new("nix-shell")
         .args([
             "-p",
@@ -35,7 +35,6 @@ async fn main() {
         .wait()
         .expect("failed to wait on shell");
     println!("{:#?}", versions.get(&options).unwrap());
-    //println!("{:#?}", versions);
 }
 
 async fn fetch_versions_from_nixpkgs(
