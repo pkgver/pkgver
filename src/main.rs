@@ -1,5 +1,6 @@
 use clap::Parser;
 use linked_hash_map::LinkedHashMap;
+use regex::Regex;
 use reqwest::header::{self, CONTENT_TYPE};
 use serde_json::Value;
 use std::io::Write;
@@ -76,6 +77,12 @@ async fn fetch_versions_from_nixpkgs(
         //goes backwards
         for i in 0..commits.len() {
             let message = commits[i].get("commit").unwrap().get("message").unwrap();
+            
+            let pattern = Regex::new(r"\d+\.\d+|\d+-\d+").unwrap();
+            if !pattern.is_match(message.as_str().unwrap()) {
+                continue;
+            }
+
             let message_split: Vec<&str> = message.as_str().unwrap().split(' ').collect();
 
             if commits.len() == 1 {
@@ -86,12 +93,6 @@ async fn fetch_versions_from_nixpkgs(
                 break;
             }
 
-            /*
-               TODO:
-                   dwmbar: init at X
-                   dwmbar: 0.1 -> 0.2
-                   dwmbar: unstableXX -> unstableYY
-            */
             if *message_split.first().unwrap() == format!("{package_name}:")
                 && message_split.len() > 2
                 && *message_split.get(2).unwrap() == "->"
