@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{command, Arg, ArgAction};
 use linked_hash_map::LinkedHashMap;
 use regex::Regex;
 use reqwest::header::{self, CONTENT_TYPE};
@@ -9,16 +9,27 @@ use std::process::{Command, Stdio};
 type Version = String;
 type CommitHash = String;
 
-#[derive(Parser, Debug)]
-struct Args {
-    package_name: String,
-}
-
 #[tokio::main]
 async fn main() {
-    let args = Args::parse();
-    let package_name = &args.package_name;
+    let args = command!()
+        .arg(Arg::new("package").required(true))
+        .arg(
+            Arg::new("shell")
+                .short('s')
+                .long("shell")
+                .action(ArgAction::SetTrue)
+                .required(false),
+        )
+        .arg(
+            Arg::new("install")
+                .short('i')
+                .long("install")
+                .action(ArgAction::SetTrue)
+                .required(false),
+        )
+        .get_matches();
 
+    let package_name = args.get_one::<String>("package").unwrap();
     let mut versions: LinkedHashMap<Version, CommitHash> = LinkedHashMap::new();
     fetch_versions_from_nixpkgs(&mut versions, package_name).await;
 
@@ -26,8 +37,63 @@ async fn main() {
     assert!(!version_keys.is_empty());
 
     let chosen_version = fzf_select(version_keys);
-    println!("{}", chosen_version);
     let version_commit = versions.get(&chosen_version).unwrap().replace('\"', "");
+    println!("{} {}", chosen_version, version_commit);
+
+    if !args.get_flag("shell") && !args.get_flag("shell") {
+        informative_message(&version_commit, &package_name)
+    }
+
+    if args.get_flag("shell") {
+        spawn_shell_with_package(&version_commit, &package_name);
+    }
+
+    if args.get_flag("install") {
+        install_package(&version_commit, &package_name);
+    }
+}
+
+fn informative_message(version_commit: &String, package_name: &str) {
+    let message = format!(
+"
+nix-shell (shell) :
+    nix-shell -p {} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/{}.tar.gz
+
+nix-env (install) :
+    nix-env -iA {} -f https://github.com/NixOS/nixpkgs/archive/{}.tar.gz
+
+nix file :
+    let
+        legacy_pkgs = import (fetchTarball https://github.com/NixOS/nixpkgs/archive/{}.tar.gz) {{ }};
+        {} = legacy_pkgs.{};
+    in
+        ...
+",
+        package_name, version_commit,
+        package_name, version_commit,
+        version_commit, package_name, package_name
+    );
+    println!("{}", message)
+}
+
+fn install_package(version_commit: &String, package_name: &str) {
+    Command::new("nix-env")
+        .args([
+            "-iA",
+            package_name,
+            "-f",
+            &format!("https://github.com/NixOS/nixpkgs/archive/{version_commit}.tar.gz"),
+        ])
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .expect("failed to start install")
+        .wait()
+        .expect("failed to wait on install");
+}
+
+fn spawn_shell_with_package(version_commit: &String, package_name: &str) {
     Command::new("nix-shell")
         .args([
             "-p",
@@ -42,10 +108,6 @@ async fn main() {
         .expect("failed to start shell")
         .wait()
         .expect("failed to wait on shell");
-    let version = versions.get(&chosen_version).unwrap_or_else(|| {
-        panic!("{package_name} version {chosen_version} wasn't found in any of the revisions!")
-    });
-    println!("{:#?}", version);
 }
 
 async fn fetch_versions_from_nixpkgs(
@@ -77,7 +139,7 @@ async fn fetch_versions_from_nixpkgs(
         //goes backwards
         for i in 0..commits.len() {
             let message = commits[i].get("commit").unwrap().get("message").unwrap();
-            
+
             let pattern = Regex::new(r"\d+\.\d+|\d+-\d+").unwrap();
             if !pattern.is_match(message.as_str().unwrap()) {
                 continue;
